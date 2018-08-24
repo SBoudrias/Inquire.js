@@ -7,7 +7,7 @@ var _ = require('lodash');
 var chalk = require('chalk');
 var cliCursor = require('cli-cursor');
 var figures = require('figures');
-var { map, takeUntil } = require('rxjs/operators');
+var { takeUntil } = require('rxjs/operators');
 var Base = require('./base');
 var observe = require('../utils/events');
 var Paginator = require('../utils/paginator');
@@ -39,20 +39,12 @@ class CheckboxPrompt extends Base {
 
   /**
    * Start the Inquiry session
-   * @param  {Function} cb      Callback when prompt is done
    * @return {this}
    */
 
-  _run(cb) {
-    this.done = cb;
-
+  _run() {
     var events = observe(this.rl);
-
-    var validation = this.handleSubmitEvents(
-      events.line.pipe(map(this.getCurrentValue.bind(this)))
-    );
-    validation.success.forEach(this.onEnd.bind(this));
-    validation.error.forEach(this.onError.bind(this));
+    var validation = this.submit(events.line);
 
     events.normalizedUpKey
       .pipe(takeUntil(validation.success))
@@ -72,9 +64,6 @@ class CheckboxPrompt extends Base {
     // Init the prompt
     cliCursor.hide();
     this.render();
-    this.firstRender = false;
-
-    return this;
   }
 
   /**
@@ -87,21 +76,21 @@ class CheckboxPrompt extends Base {
     var message = this.getQuestion();
     var bottomContent = '';
 
-    if (this.firstRender) {
-      message +=
-        '(Press ' +
-        chalk.cyan.bold('<space>') +
-        ' to select, ' +
-        chalk.cyan.bold('<a>') +
-        ' to toggle all, ' +
-        chalk.cyan.bold('<i>') +
-        ' to invert selection)';
-    }
-
     // Render choices or answer depending on the state
     if (this.status === 'answered') {
       message += chalk.cyan(this.selection.join(', '));
     } else {
+      if (this.firstRender) {
+        this.firstRender = false;
+        message +=
+          '(Press ' +
+          chalk.cyan.bold('<space>') +
+          ' to select, ' +
+          chalk.cyan.bold('<a>') +
+          ' to toggle all, ' +
+          chalk.cyan.bold('<i>') +
+          ' to invert selection)';
+      }
       var choicesStr = renderChoices(this.opt.choices, this.pointer);
       var indexPosition = this.opt.choices.indexOf(
         this.opt.choices.getChoice(this.pointer)
@@ -122,10 +111,7 @@ class CheckboxPrompt extends Base {
    */
 
   onEnd(state) {
-    this.status = 'answered';
-
-    // Rerender prompt (and clean subline error)
-    this.render();
+    super.onEnd();
 
     this.screen.done();
     cliCursor.show();
@@ -143,6 +129,25 @@ class CheckboxPrompt extends Base {
 
     this.selection = _.map(choices, 'short');
     return _.map(choices, 'value');
+  }
+
+  filterBypass(input) {
+    var choices = this.opt.choices;
+    var valid = true;
+    var list = Array.isArray(input) ? input : input.split(',');
+    list.forEach(input => {
+      var idx = Number(input);
+      var choice = Number.isNaN(idx)
+        ? choices.find(c => c.name === input || c.value === input)
+        : choices.get(idx);
+
+      if (choice) {
+        choice.checked = true;
+      } else {
+        valid = false;
+      }
+    });
+    return valid || null;
   }
 
   onUpKey() {
