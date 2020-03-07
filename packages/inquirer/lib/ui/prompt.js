@@ -106,6 +106,11 @@ class PromptUI extends Base {
       question.type = 'input';
     }
 
+    // By default, don't include disabled choices in answers
+    if (typeof question.includeDisabled === 'undefined') {
+      question.includeDisabled = false;
+    }
+
     return defer(() => of(question));
   }
 
