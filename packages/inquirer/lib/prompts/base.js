@@ -29,6 +29,8 @@ class Prompt {
       when: () => true,
       suffix: '',
       prefix: chalk.green('?'),
+      helper: undefined,
+      pageHelper: undefined,
     });
 
     // Make sure name is present
